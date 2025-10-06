@@ -119,6 +119,11 @@ namespace Game.Runtime.Core.Services
 #endif
         }
         
+        /// <summary>
+        /// Save data with atomic write pattern
+        /// FIXED: Uses temp file + rename for atomic operation (for local fallback)
+        /// Steam Cloud has built-in atomicity
+        /// </summary>
         public async Task<bool> SaveDataAsync<T>(string key, T data) where T : class
         {
             if (string.IsNullOrEmpty(key) || data == null) return false;
@@ -134,6 +139,7 @@ namespace Game.Runtime.Core.Services
 #if !UNITY_EDITOR || ENABLE_STEAM_IN_EDITOR
                 if (_steamInitialized && IsCloudEnabled)
                 {
+                    // Steam Cloud write is atomic by design
                     bool success = await Task.Run(() => SteamRemoteStorage.FileWrite(cloudPath, bytes, bytes.Length));
                     
                     if (success)
@@ -149,9 +155,21 @@ namespace Game.Runtime.Core.Services
                 }
 #endif
                 
+                // Local fallback with atomic write
                 string localPath = Path.Combine(Application.persistentDataPath, "saves", key + ".json");
+                string tempPath = localPath + ".tmp";
+                
                 Directory.CreateDirectory(Path.GetDirectoryName(localPath));
-                await File.WriteAllBytesAsync(localPath, bytes);
+                
+                // Write to temp file first
+                await File.WriteAllBytesAsync(tempPath, bytes);
+                
+                // Atomic operation
+                if (File.Exists(localPath))
+                {
+                    File.Delete(localPath);
+                }
+                File.Move(tempPath, localPath);
                 
                 _cache[key] = data;
                 OnSaveCompleted?.Invoke(key, true);

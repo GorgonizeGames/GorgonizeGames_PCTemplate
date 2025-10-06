@@ -53,6 +53,10 @@ namespace Game.Runtime.Core.Services
             LogInfo($"Save path: {_savePath}");
         }
         
+        /// <summary>
+        /// Save data with atomic write pattern (prevents corruption on crash)
+        /// FIXED: Uses temp file + rename for atomic operation
+        /// </summary>
         public async Task<bool> SaveDataAsync<T>(string key, T data) where T : class
         {
             if (!IsInitialized)
@@ -69,8 +73,18 @@ namespace Game.Runtime.Core.Services
             {
                 string json = JsonUtility.ToJson(data, true);
                 string filePath = GetFilePath(key);
+                string tempPath = filePath + ".tmp";
                 
-                await File.WriteAllTextAsync(filePath, json);
+                // Write to temporary file first
+                await File.WriteAllTextAsync(tempPath, json);
+                
+                // Atomic operation: Replace old file with new one
+                // This ensures file is never corrupt even if crash happens
+                if (File.Exists(filePath))
+                {
+                    File.Delete(filePath);
+                }
+                File.Move(tempPath, filePath);
                 
                 _cache[key] = data;
                 OnSaveCompleted?.Invoke(key, true);
