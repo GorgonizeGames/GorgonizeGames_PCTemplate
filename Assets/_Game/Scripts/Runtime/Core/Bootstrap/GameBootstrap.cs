@@ -7,8 +7,6 @@ using Game.Runtime.Core.DI;
 using Game.Runtime.Core.Services;
 using Game.Runtime.Core.Services.Factories;
 using Game.Runtime.UI.Windows;
-using Game.Runtime.Investigation.Services;
-using Game.Runtime.Hacking.Services;
 
 namespace Game.Runtime.Core.Bootstrap
 {
@@ -26,11 +24,6 @@ namespace Game.Runtime.Core.Bootstrap
         
         [Header("UI Services")]
         [SerializeField] private WindowManager _windowManager;
-        
-        [Header("Game Services")]
-        [SerializeField] private EvidenceService _evidenceService;
-        [SerializeField] private ClueService _clueService;
-        [SerializeField] private HackingService _hackingService;
         
         [Header("Settings")]
         [SerializeField] private GameSettings _gameSettings;
@@ -142,9 +135,6 @@ namespace Game.Runtime.Core.Bootstrap
             if (_sceneService == null) missingServices.Add("SceneService");
             if (_inputService == null) missingServices.Add("InputService");
             if (_windowManager == null) missingServices.Add("WindowManager");
-            if (_evidenceService == null) missingServices.Add("EvidenceService");
-            if (_clueService == null) missingServices.Add("ClueService");
-            if (_hackingService == null) missingServices.Add("HackingService");
             
             if (missingServices.Count > 0)
             {
@@ -177,11 +167,6 @@ namespace Game.Runtime.Core.Bootstrap
             
             // UI Services (Priority 51-100)
             RegisterServiceByInterface<IWindowManager, WindowManager>(container, _windowManager);
-            
-            // Game Services (Priority 11-50)
-            RegisterServiceByInterface<IEvidenceService, EvidenceService>(container, _evidenceService);
-            RegisterServiceByInterface<IClueService, ClueService>(container, _clueService);
-            RegisterServiceByInterface<IHackingService, HackingService>(container, _hackingService);
             
             // Settings (concrete type is fine)
             if (_gameSettings != null)
@@ -414,58 +399,6 @@ namespace Game.Runtime.Core.Bootstrap
         }
         
 #if UNITY_EDITOR
-        [ContextMenu("Test Save System")]
-        private async void TestSaveSystem()
-        {
-            if (_saveService == null)
-            {
-                Debug.LogError("SaveService not initialized!");
-                return;
-            }
-            
-            Debug.Log("==================== SAVE SYSTEM TEST ====================");
-            
-            var testData = new Data.SaveData
-            {
-                Player = new Data.PlayerData 
-                { 
-                    PlayerName = "TestDetective",
-                    Level = 5,
-                    CasesCompleted = 3
-                },
-                CurrentCaseId = "case_001",
-                TotalPlayTime = 1234.5f
-            };
-            
-            Debug.Log("Testing save...");
-            bool saveSuccess = await _saveService.SaveToSlotAsync(0, testData);
-            Debug.Log($"Save: {(saveSuccess ? "✅ SUCCESS" : "❌ FAILED")}");
-            
-            Debug.Log("Testing load...");
-            var loadedData = await _saveService.LoadFromSlotAsync(0);
-            
-            if (loadedData != null)
-            {
-                Debug.Log("✅ Load SUCCESS");
-                Debug.Log($"  Player: {loadedData.Player.PlayerName}");
-                Debug.Log($"  Level: {loadedData.Player.Level}");
-                Debug.Log($"  Cases: {loadedData.Player.CasesCompleted}");
-            }
-            else
-            {
-                Debug.LogError("❌ Load FAILED");
-            }
-            
-            var slots = _saveService.GetAllSaveSlots();
-            Debug.Log($"Found {slots.Count} save slots");
-            
-            foreach (var slot in slots)
-            {
-                Debug.Log($"  Slot {slot.SlotIndex}: {slot.LastSaveTime} - Cloud: {slot.IsCloudSynced}");
-            }
-            
-            Debug.Log("========================================================");
-        }
         
         [ContextMenu("Show Service Info")]
         private void ShowServiceInfo()
@@ -497,9 +430,6 @@ namespace Game.Runtime.Core.Bootstrap
             allValid &= ValidateServiceEditor(_sceneService, "SceneService");
             allValid &= ValidateServiceEditor(_inputService, "InputService");
             allValid &= ValidateServiceEditor(_windowManager, "WindowManager");
-            allValid &= ValidateServiceEditor(_evidenceService, "EvidenceService");
-            allValid &= ValidateServiceEditor(_clueService, "ClueService");
-            allValid &= ValidateServiceEditor(_hackingService, "HackingService");
             allValid &= ValidateServiceEditor(_gameSettings, "GameSettings");
             
             Debug.Log("===========================================================");

@@ -10,7 +10,7 @@ namespace Game.Editor
     [InitializeOnLoad]
     public static class PlayFromBootstrapToolbar
     {
-        private const string BOOTSTRAP_SCENE_PATH = "Assets/Scenes/Bootstrap.unity";
+        private const string BOOTSTRAP_SCENE_PATH = "Assets/_Game/Scenes/Bootstrap.unity";
         private const string RETURN_SCENE_KEY = "BootstrapToolbar.ReturnScene";
 
 
