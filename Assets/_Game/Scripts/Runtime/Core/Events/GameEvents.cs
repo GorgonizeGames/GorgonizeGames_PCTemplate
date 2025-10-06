@@ -74,51 +74,6 @@ namespace Game.Runtime.Core.Events
         public string WindowId;
     }
     
-    // ==================== INVESTIGATION EVENTS ====================
-    public struct EvidenceFoundEvent : IGameEvent
-    {
-        public string EvidenceId;
-        public string CaseId;
-        public string Description;
-    }
-    
-    public struct ClueDiscoveredEvent : IGameEvent
-    {
-        public string ClueId;
-        public string Description;
-    }
-    
-    public struct CaseProgressEvent : IGameEvent
-    {
-        public string CaseId;
-        public float ProgressPercentage;
-    }
-    
-    public struct CaseCompletedEvent : IGameEvent
-    {
-        public string CaseId;
-        public bool Success;
-    }
-    
-    // ==================== HACKING EVENTS ====================
-    public struct HackingStartedEvent : IGameEvent
-    {
-        public string TargetId;
-        public string HackType;
-    }
-    
-    public struct HackingCompletedEvent : IGameEvent
-    {
-        public string TargetId;
-        public bool Success;
-    }
-    
-    public struct HackingFailedEvent : IGameEvent
-    {
-        public string TargetId;
-        public string Reason;
-    }
-    
     // ==================== AUDIO EVENTS ====================
     public struct MusicStartedEvent : IGameEvent
     {

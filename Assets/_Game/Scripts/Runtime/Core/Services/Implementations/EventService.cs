@@ -5,11 +5,6 @@ using UnityEngine;
 
 namespace Game.Runtime.Core.Services
 {
-    /// <summary>
-    /// Event Service - Implements Event-Driven Architecture
-    /// Manages all game events with type-safe publish/subscribe pattern
-    /// Priority 0: Must initialize first - DOES NOT use ServiceBase (circular dependency)
-    /// </summary>
     public class EventService : MonoBehaviour, IEventService, IInitializable
     {
         private readonly Dictionary<Type, Delegate> _eventCallbacks = new Dictionary<Type, Delegate>();
@@ -47,9 +42,6 @@ namespace Game.Runtime.Core.Services
             Debug.Log("[EventService] ✅ Initialized successfully");
         }
 
-        /// <summary>
-        /// Subscribe to an event type
-        /// </summary>
         public void Subscribe<T>(Action<T> callback) where T : struct, IGameEvent
         {
             if (callback == null)
@@ -75,9 +67,6 @@ namespace Game.Runtime.Core.Services
             }
         }
 
-        /// <summary>
-        /// Unsubscribe from an event type
-        /// </summary>
         public void Unsubscribe<T>(Action<T> callback) where T : struct, IGameEvent
         {
             if (callback == null)
@@ -104,9 +93,6 @@ namespace Game.Runtime.Core.Services
             }
         }
 
-        /// <summary>
-        /// Publish an event to all subscribers
-        /// </summary>
         public void Publish<T>(T eventData) where T : struct, IGameEvent
         {
             Type eventType = typeof(T);
@@ -153,9 +139,6 @@ namespace Game.Runtime.Core.Services
             }
         }
         
-        /// <summary>
-        /// Queue an event for later processing
-        /// </summary>
         private void QueueEvent(Type eventType, object eventData)
         {
             if (_eventQueue.Count >= _maxQueueSize)
@@ -177,9 +160,6 @@ namespace Game.Runtime.Core.Services
             }
         }
         
-        /// <summary>
-        /// Process all queued events
-        /// </summary>
         private void ProcessQueuedEvents()
         {
             if (_eventQueue.Count == 0) return;
@@ -222,9 +202,6 @@ namespace Game.Runtime.Core.Services
             }
         }
 
-        /// <summary>
-        /// Clear all subscriptions
-        /// </summary>
         public void Clear()
         {
             int callbackCount = _eventCallbacks.Count;
@@ -239,9 +216,6 @@ namespace Game.Runtime.Core.Services
             }
         }
         
-        /// <summary>
-        /// Get the number of subscribers for a specific event type
-        /// </summary>
         public int GetSubscriberCount<T>() where T : struct, IGameEvent
         {
             Type eventType = typeof(T);
@@ -252,16 +226,21 @@ namespace Game.Runtime.Core.Services
             return 0;
         }
         
-        /// <summary>
-        /// Get all registered event types
-        /// </summary>
         public IEnumerable<Type> GetRegisteredEventTypes()
         {
             return _eventCallbacks.Keys;
         }
 
+        /// <summary>
+        /// ✅ FIXED: Added memory leak warning
+        /// </summary>
         private void OnDestroy()
         {
+            if (_eventCallbacks.Count > 0)
+            {
+                Debug.LogWarning($"[EventService] Destroying with {_eventCallbacks.Count} active subscriptions. Consider manual cleanup to prevent memory leaks.");
+            }
+            
             Clear();
             IsInitialized = false;
             Debug.Log("[EventService] Destroyed");

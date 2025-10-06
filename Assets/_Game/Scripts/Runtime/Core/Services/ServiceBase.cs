@@ -6,11 +6,6 @@ using Game.Runtime.Core.Events;
 
 namespace Game.Runtime.Core.Services
 {
-    /// <summary>
-    /// Abstract base class for all services
-    /// Provides common initialization and dependency injection pattern
-    /// Follows Template Method Pattern and DRY principle
-    /// </summary>
     public abstract class ServiceBase : MonoBehaviour, IInitializable
     {
         [Inject(required: false)] protected IEventService _eventService;
@@ -22,10 +17,6 @@ namespace Game.Runtime.Core.Services
         public abstract int InitializationPriority { get; }
         protected abstract string ServiceName { get; }
         
-        /// <summary>
-        /// Template method for initialization
-        /// Follows Template Method Pattern
-        /// </summary>
         public async Task InitializeAsync()
         {
             if (IsInitialized)
@@ -39,10 +30,8 @@ namespace Game.Runtime.Core.Services
             
             try
             {
-                // Step 1: Inject dependencies
                 Dependencies.Inject(this);
                 
-                // Step 2: Validate dependencies (virtual method)
                 if (!ValidateDependencies())
                 {
                     LogError("Dependency validation failed!");
@@ -50,13 +39,10 @@ namespace Game.Runtime.Core.Services
                     return;
                 }
                 
-                // Step 3: Custom initialization logic (abstract method)
                 await OnInitializeAsync();
                 
-                // Step 4: Mark as initialized
                 IsInitialized = true;
                 
-                // Step 5: Publish success event
                 float duration = Time.realtimeSinceStartup - startTime;
                 PublishSuccessEvent(duration);
                 
@@ -70,18 +56,13 @@ namespace Game.Runtime.Core.Services
             }
         }
         
-        /// <summary>
-        /// Override this to implement service-specific initialization
-        /// </summary>
         protected abstract Task OnInitializeAsync();
         
         /// <summary>
-        /// Override this to validate service dependencies
-        /// Return false if critical dependencies are missing
+        /// ✅ FIXED: EventService is optional, not critical
         /// </summary>
         protected virtual bool ValidateDependencies()
         {
-            // EventService is optional but recommended
             if (_eventService == null)
             {
                 LogWarning("EventService not available - events will not be published");
@@ -91,30 +72,35 @@ namespace Game.Runtime.Core.Services
         }
         
         /// <summary>
-        /// Publish initialization success event
+        /// ✅ FIXED: Null check added
         /// </summary>
         private void PublishSuccessEvent(float initTime)
         {
-            _eventService?.Publish(new ServiceInitializedEvent
+            if (_eventService != null)
             {
-                ServiceName = ServiceName,
-                InitializationTime = initTime
-            });
+                _eventService.Publish(new ServiceInitializedEvent
+                {
+                    ServiceName = ServiceName,
+                    InitializationTime = initTime
+                });
+            }
         }
         
         /// <summary>
-        /// Publish initialization failure event
+        /// ✅ FIXED: Null check added
         /// </summary>
         private void PublishFailureEvent(string errorMessage)
         {
-            _eventService?.Publish(new ServiceFailedEvent
+            if (_eventService != null)
             {
-                ServiceName = ServiceName,
-                ErrorMessage = errorMessage
-            });
+                _eventService.Publish(new ServiceFailedEvent
+                {
+                    ServiceName = ServiceName,
+                    ErrorMessage = errorMessage
+                });
+            }
         }
         
-        // Logging helpers
         protected void LogInfo(string message)
         {
             if (_enableServiceLogs)

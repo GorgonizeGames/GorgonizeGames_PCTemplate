@@ -120,9 +120,7 @@ namespace Game.Runtime.Core.Services
         }
         
         /// <summary>
-        /// Save data with atomic write pattern
-        /// FIXED: Uses temp file + rename for atomic operation (for local fallback)
-        /// Steam Cloud has built-in atomicity
+        /// ✅ FIXED: Save data with atomic write pattern
         /// </summary>
         public async Task<bool> SaveDataAsync<T>(string key, T data) where T : class
         {
@@ -139,7 +137,6 @@ namespace Game.Runtime.Core.Services
 #if !UNITY_EDITOR || ENABLE_STEAM_IN_EDITOR
                 if (_steamInitialized && IsCloudEnabled)
                 {
-                    // Steam Cloud write is atomic by design
                     bool success = await Task.Run(() => SteamRemoteStorage.FileWrite(cloudPath, bytes, bytes.Length));
                     
                     if (success)
@@ -151,20 +148,19 @@ namespace Game.Runtime.Core.Services
                     }
                     
                     OnSaveCompleted?.Invoke(key, false);
+                    _eventService?.Publish(new GameSavedEvent { SaveSlot = key, Success = false });
                     return false;
                 }
 #endif
                 
-                // Local fallback with atomic write
+                // ✅ FIXED: Local fallback with atomic write
                 string localPath = Path.Combine(Application.persistentDataPath, "saves", key + ".json");
                 string tempPath = localPath + ".tmp";
                 
                 Directory.CreateDirectory(Path.GetDirectoryName(localPath));
                 
-                // Write to temp file first
                 await File.WriteAllBytesAsync(tempPath, bytes);
                 
-                // Atomic operation
                 if (File.Exists(localPath))
                 {
                     File.Delete(localPath);
@@ -173,12 +169,15 @@ namespace Game.Runtime.Core.Services
                 
                 _cache[key] = data;
                 OnSaveCompleted?.Invoke(key, true);
+                _eventService?.Publish(new GameSavedEvent { SaveSlot = key, Success = true });
+                
                 return true;
             }
             catch (Exception e)
             {
                 LogError($"Save failed: {e.Message}");
                 OnSaveCompleted?.Invoke(key, false);
+                _eventService?.Publish(new GameSavedEvent { SaveSlot = key, Success = false });
                 return false;
             }
         }
@@ -230,16 +229,19 @@ namespace Game.Runtime.Core.Services
                     
                     _cache[key] = data;
                     OnLoadCompleted?.Invoke(key, true);
+                    _eventService?.Publish(new GameLoadedEvent { SaveSlot = key, Success = true });
                     return data;
                 }
                 
                 OnLoadCompleted?.Invoke(key, false);
+                _eventService?.Publish(new GameLoadedEvent { SaveSlot = key, Success = false });
                 return null;
             }
             catch (Exception e)
             {
                 LogError($"Load failed: {e.Message}");
                 OnLoadCompleted?.Invoke(key, false);
+                _eventService?.Publish(new GameLoadedEvent { SaveSlot = key, Success = false });
                 return null;
             }
         }
@@ -262,6 +264,14 @@ namespace Game.Runtime.Core.Services
                 }
 #endif
                 
+                string localPath = Path.Combine(Application.persistentDataPath, "saves", key + ".json");
+                if (File.Exists(localPath))
+                {
+                    await Task.Run(() => File.Delete(localPath));
+                    _cache.Remove(key);
+                    return true;
+                }
+                
                 return false;
             }
             catch (Exception e)
@@ -283,12 +293,14 @@ namespace Game.Runtime.Core.Services
             {
                 await Task.Delay(100);
                 OnCloudSyncCompleted?.Invoke(true);
+                _eventService?.Publish(new CloudSyncCompletedEvent { Success = true });
                 return true;
             }
             catch (Exception e)
             {
                 LogError($"Sync failed: {e.Message}");
                 OnCloudSyncCompleted?.Invoke(false);
+                _eventService?.Publish(new CloudSyncCompletedEvent { Success = false });
                 return false;
             }
         }

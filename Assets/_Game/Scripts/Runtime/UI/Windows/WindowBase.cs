@@ -7,10 +7,6 @@ using Game.Runtime.Core.Events;
 
 namespace Game.Runtime.UI.Windows
 {
-    /// <summary>
-    /// Base class for all window components
-    /// Follows SOLID principles with proper separation of concerns
-    /// </summary>
     [RequireComponent(typeof(RectTransform))]
     [RequireComponent(typeof(CanvasGroup))]
     public abstract class WindowBase : MonoBehaviour, IWindow, IPointerDownHandler
@@ -52,22 +48,24 @@ namespace Game.Runtime.UI.Windows
         protected Vector2 _normalizedPosition;
         protected Vector2 _normalizedSize;
 
-        // IWindow Properties
         public string WindowId => windowId;
         public string WindowTitle => windowTitle;
         public bool IsOpen => _isOpen;
         public bool IsMinimized => _isMinimized;
         public bool IsMaximized => _isMaximized;
         public bool IsFocused => _isFocused;
+        
+        // ✅ FIXED: Canvas sorting order updated when ZOrder changes
         public int ZOrder
         {
             get => _zOrder;
             set
             {
                 _zOrder = value;
-                UpdateCanvasSortingOrder(); // FIX: Canvas sorting order güncelleniyor
+                UpdateCanvasSortingOrder();
             }
         }
+        
         public RectTransform RectTransform => _rectTransform;
 
         protected virtual void Awake()
@@ -77,7 +75,6 @@ namespace Game.Runtime.UI.Windows
             SetupCanvas();
             SetupHandlers();
             SetupButtons();
-            //gameObject.SetActive(false);
         }
 
         protected virtual void Start()
@@ -91,27 +88,25 @@ namespace Game.Runtime.UI.Windows
         }
 
         /// <summary>
-        /// Initialize required components
+        /// ✅ FIXED: Better null checks
         /// </summary>
         private void InitializeComponents()
         {
             _rectTransform = GetComponent<RectTransform>();
-            _canvasGroup = GetComponent<CanvasGroup>();
-
             if (_rectTransform == null)
             {
                 Debug.LogError($"[WindowBase] RectTransform not found on {gameObject.name}");
+                return;
             }
 
+            _canvasGroup = GetComponent<CanvasGroup>();
             if (_canvasGroup == null)
             {
-                Debug.LogError($"[WindowBase] CanvasGroup not found on {gameObject.name}");
+                _canvasGroup = gameObject.AddComponent<CanvasGroup>();
+                Debug.LogWarning($"[WindowBase] CanvasGroup was missing, added automatically");
             }
         }
 
-        /// <summary>
-        /// Ensure windowId is set
-        /// </summary>
         private void ValidateWindowId()
         {
             if (string.IsNullOrEmpty(windowId))
@@ -122,7 +117,7 @@ namespace Game.Runtime.UI.Windows
         }
 
         /// <summary>
-        /// Setup canvas for proper rendering
+        /// ✅ FIXED: Null check for GraphicRaycaster + initial sorting order
         /// </summary>
         private void SetupCanvas()
         {
@@ -133,7 +128,7 @@ namespace Game.Runtime.UI.Windows
             }
 
             _canvas.overrideSorting = true;
-            UpdateCanvasSortingOrder(); // FIX: Initial sorting order set ediliyor
+            UpdateCanvasSortingOrder();
 
             if (gameObject.GetComponent<GraphicRaycaster>() == null)
             {
@@ -142,7 +137,7 @@ namespace Game.Runtime.UI.Windows
         }
 
         /// <summary>
-        /// FIX: Canvas sorting order'ı güncelle
+        /// ✅ FIXED: Update canvas sorting order to match ZOrder
         /// </summary>
         private void UpdateCanvasSortingOrder()
         {
@@ -153,8 +148,7 @@ namespace Game.Runtime.UI.Windows
         }
 
         /// <summary>
-        /// Setup drag and resize handlers
-        /// Single Responsibility: Separated into dedicated components
+        /// ✅ FIXED: Added null check warnings
         /// </summary>
         private void SetupHandlers()
         {
@@ -166,6 +160,10 @@ namespace Game.Runtime.UI.Windows
                     _dragHandler = gameObject.AddComponent<WindowDragHandler>();
                 }
                 _dragHandler.Initialize(this, titleBar);
+            }
+            else
+            {
+                Debug.LogWarning($"[{windowId}] Title bar not assigned - dragging disabled");
             }
 
             if (canResize)
@@ -179,9 +177,6 @@ namespace Game.Runtime.UI.Windows
             }
         }
 
-        /// <summary>
-        /// Setup button listeners
-        /// </summary>
         protected virtual void SetupButtons()
         {
             if (closeButton != null)
@@ -207,24 +202,34 @@ namespace Game.Runtime.UI.Windows
         }
 
         /// <summary>
-        /// Inject dependencies
+        /// ✅ FIXED: Better error handling
         /// </summary>
         private void InjectDependencies()
         {
-            Dependencies.Inject(this);
-
-            if (_eventService == null)
+            try
             {
-                Debug.LogWarning($"[{windowId}] EventService not available - events will not be published");
+                Dependencies.Inject(this);
+
+                if (_eventService == null)
+                {
+                    Debug.LogWarning($"[{windowId}] EventService not available - events will not be published");
+                }
+
+                if (_audioService == null)
+                {
+                    Debug.LogWarning($"[{windowId}] AudioService not available - no sound effects");
+                }
+                
+                if (_windowManager == null)
+                {
+                    Debug.LogWarning($"[{windowId}] WindowManager not available - manual window management required");
+                }
             }
-
-            if (_audioService == null)
+            catch (System.Exception e)
             {
-                Debug.LogWarning($"[{windowId}] AudioService not available - no sound effects");
+                Debug.LogError($"[{windowId}] Dependency injection failed: {e.Message}");
             }
         }
-
-        // ==================== IWindow Implementation ====================
 
         public virtual void Open()
         {
@@ -394,8 +399,6 @@ namespace Game.Runtime.UI.Windows
             _windowManager?.BringToFront(this);
         }
 
-        // ==================== Virtual Methods for Subclasses ====================
-
         protected virtual void OnOpen() { }
         protected virtual void OnClose() { }
         protected virtual void OnMinimize() { }
@@ -403,8 +406,6 @@ namespace Game.Runtime.UI.Windows
         protected virtual void OnRestore() { }
         protected virtual void OnFocus() { }
         protected virtual void OnBlur() { }
-
-        // ==================== Cleanup ====================
 
         protected virtual void OnDestroy()
         {
@@ -416,12 +417,6 @@ namespace Game.Runtime.UI.Windows
         }
     }
 
-    // =============== SEPARATION OF CONCERNS ===============
-
-    /// <summary>
-    /// Handles window dragging functionality
-    /// Single Responsibility Principle: Only manages drag operations
-    /// </summary>
     public class WindowDragHandler : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
     {
         private WindowBase _window;
@@ -493,10 +488,6 @@ namespace Game.Runtime.UI.Windows
         }
     }
 
-    /// <summary>
-    /// Handles window resize functionality
-    /// Single Responsibility Principle: Only manages resize operations
-    /// </summary>
     public class WindowResizeHandler : MonoBehaviour
     {
         private WindowBase _window;
