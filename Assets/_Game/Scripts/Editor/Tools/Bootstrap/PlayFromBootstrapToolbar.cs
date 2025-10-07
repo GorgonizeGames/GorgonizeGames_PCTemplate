@@ -1,11 +1,11 @@
+#if UNITY_EDITOR
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using System.Reflection;
 using UnityToolbarExtender;
 
-namespace Game.Editor
+namespace Game.Editor.Tools.Bootstrap
 {
     [InitializeOnLoad]
     public static class PlayFromBootstrapToolbar
@@ -38,7 +38,7 @@ namespace Game.Editor
             GUI.backgroundColor = new Color(0.7f, 0.7f, 0.9f);
 
             // Sahne ikonu: 🎬 (film klaperi) veya 🎭 (maske) veya 🎪 (çadır)
-            if (GUILayout.Button("🎬 Bootstrap", gotoButtonStyle))
+            if (GUILayout.Button("🎬GoToBootstrap", gotoButtonStyle))
             {
                 GoToBootstrap();
             }
@@ -55,12 +55,12 @@ namespace Game.Editor
                 fontSize = 11,
                 fontStyle = FontStyle.Bold,
                 fixedHeight = 22,
-                fixedWidth = 120
+                fixedWidth = 150
             };
 
             GUI.backgroundColor = EditorApplication.isPlaying ? Color.red : Color.green;
 
-            string buttonText = EditorApplication.isPlaying ? "■ Stop (F5)" : "▶ Bootstrap (F5)";
+            string buttonText = EditorApplication.isPlaying ? "■ Stop (F5)" : "▶ PlayFromBootstrap (F5)";
 
             if (GUILayout.Button(buttonText, playButtonStyle))
             {
@@ -144,3 +144,4 @@ namespace Game.Editor
         }
     }
 }
+#endif
