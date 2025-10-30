@@ -1,8 +1,8 @@
-using System.Collections;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using UnityEngine;
 using Game.Runtime.Core.Events;
+using Game.Runtime.Utilities;
 
 namespace Game.Runtime.Core.Services
 {
@@ -44,8 +44,10 @@ namespace Game.Runtime.Core.Services
         {
             if (_loadAudioFromResources)
             {
-                await LoadAudioLibrariesAsync();
+                LoadAudioLibraries();  // ✅ FIXED: Sync method on main thread
             }
+            
+            await Task.CompletedTask;
             
             LogInfo($"Initialized with {_musicLibrary.Count} music, {_sfxLibrary.Count} SFX");
         }
@@ -83,22 +85,25 @@ namespace Game.Runtime.Core.Services
             UpdateVolumes();
         }
         
-        private async Task LoadAudioLibrariesAsync()
+        /// <summary>
+        /// ✅ FIXED: Sync method - runs on main thread
+        /// Resources.LoadAll MUST run on Unity main thread
+        /// </summary>
+        private void LoadAudioLibraries()
         {
-            await Task.Run(() =>
+            // Load music from Resources/Audio/Music folder
+            AudioClip[] musicClips = Resources.LoadAll<AudioClip>("Audio/Music");
+            foreach (var clip in musicClips)
             {
-                AudioClip[] musicClips = Resources.LoadAll<AudioClip>("Audio/Music");
-                foreach (var clip in musicClips)
-                {
-                    _musicLibrary[clip.name] = clip;
-                }
-                
-                AudioClip[] sfxClips = Resources.LoadAll<AudioClip>("Audio/SFX");
-                foreach (var clip in sfxClips)
-                {
-                    _sfxLibrary[clip.name] = clip;
-                }
-            });
+                _musicLibrary[clip.name] = clip;
+            }
+            
+            // Load SFX from Resources/Audio/SFX folder
+            AudioClip[] sfxClips = Resources.LoadAll<AudioClip>("Audio/SFX");
+            foreach (var clip in sfxClips)
+            {
+                _sfxLibrary[clip.name] = clip;
+            }
         }
         
         private void EnsureInitialized()
@@ -115,16 +120,24 @@ namespace Game.Runtime.Core.Services
             
             if (!_musicLibrary.TryGetValue(musicId, out AudioClip clip))
             {
-                LogWarning($"Music '{musicId}' not found");
+                LogWarning($"Music '{musicId}' not found in library");
                 return;
             }
             
-            if (_musicFadeCoroutine != null) StopCoroutine(_musicFadeCoroutine);
+            if (_musicFadeCoroutine != null)
+            {
+                Coroutines.Stop(_musicFadeCoroutine);
+            }
             
             _musicSource.clip = clip;
             _musicSource.loop = loop;
-            _musicFadeCoroutine = StartCoroutine(FadeMusic(_musicSource, 0f, _musicVolume * _masterVolume, fadeInDuration));
             _musicSource.Play();
+            
+            float targetVolume = _musicVolume * _masterVolume;
+            _musicFadeCoroutine = Coroutines.Lerp(
+                fadeInDuration,
+                t => _musicSource.volume = Mathf.Lerp(0f, targetVolume, t)
+            );
             
             _eventService?.Publish(new MusicStartedEvent { MusicId = musicId });
         }
@@ -135,12 +148,22 @@ namespace Game.Runtime.Core.Services
             {
                 string currentMusic = _musicSource.clip?.name;
                 
-                if (_musicFadeCoroutine != null) StopCoroutine(_musicFadeCoroutine);
-                _musicFadeCoroutine = StartCoroutine(FadeMusic(_musicSource, _musicSource.volume, 0f, fadeOutDuration, () =>
+                if (_musicFadeCoroutine != null)
                 {
-                    _musicSource.Stop();
-                    _eventService?.Publish(new MusicStoppedEvent { MusicId = currentMusic });
-                }));
+                    Coroutines.Stop(_musicFadeCoroutine);
+                }
+                
+                float startVolume = _musicSource.volume;
+                
+                _musicFadeCoroutine = Coroutines.Lerp(
+                    fadeOutDuration,
+                    t => _musicSource.volume = Mathf.Lerp(startVolume, 0f, t),
+                    () =>
+                    {
+                        _musicSource.Stop();
+                        _eventService?.Publish(new MusicStoppedEvent { MusicId = currentMusic });
+                    }
+                );
             }
         }
         
@@ -150,7 +173,7 @@ namespace Game.Runtime.Core.Services
             
             if (!_sfxLibrary.TryGetValue(soundId, out AudioClip clip))
             {
-                LogWarning($"Sound '{soundId}' not found");
+                LogWarning($"Sound '{soundId}' not found in library");
                 return;
             }
             
@@ -202,23 +225,10 @@ namespace Game.Runtime.Core.Services
         
         private void UpdateVolumes()
         {
-            if (_musicSource != null) _musicSource.volume = _musicVolume * _masterVolume;
-        }
-        
-        private IEnumerator FadeMusic(AudioSource source, float startVolume, float targetVolume, float duration, System.Action onComplete = null)
-        {
-            float elapsed = 0f;
-            source.volume = startVolume;
-            
-            while (elapsed < duration)
+            if (_musicSource != null && !_musicSource.isPlaying)
             {
-                elapsed += Time.deltaTime;
-                source.volume = Mathf.Lerp(startVolume, targetVolume, elapsed / duration);
-                yield return null;
+                _musicSource.volume = _musicVolume * _masterVolume;
             }
-            
-            source.volume = targetVolume;
-            onComplete?.Invoke();
         }
     }
 }
